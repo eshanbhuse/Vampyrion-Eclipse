@@ -1,9 +1,28 @@
+
+import os
+import sys
+import pygame
+from os.path import join
 from settings import *
 from player import Player
 from sprites import *
 from random import randint, choice
 from pytmx.util_pygame import load_pygame
 from groups import AllSprites
+from settings import WINDOW_WIDTH, WINDOW_HEIGHT
+import math
+
+
+def resource_path(relative_path):
+    """Get absolute path to resource, works for dev and PyInstaller exe."""
+    try:
+        base_path = sys._MEIPASS 
+    except Exception:
+       
+        base_path = os.path.abspath("..")
+    return os.path.join(base_path, relative_path)
+
+
 class Game:
     def __init__(self):
         pygame.init()
@@ -13,11 +32,9 @@ class Game:
         self.running = True
 
         self.all_sprites = AllSprites()
-
         self.collision_sprites = pygame.sprite.Group()
         self.bullet_sprites = pygame.sprite.Group()
         self.enemy_sprites = pygame.sprite.Group()
-
 
         self.can_shoot = True
         self.shoot_time = 0
@@ -27,29 +44,30 @@ class Game:
         pygame.time.set_timer(self.enemy_event, 300)
         self.spawn_positions = []
 
-        self.shoot_sound = pygame.mixer.Sound(join('audio','shoot.wav'))
+ 
+        self.shoot_sound = pygame.mixer.Sound(resource_path(join('audio', 'shoot.wav')))
         self.shoot_sound.set_volume(0.4)
-        self.impact_sound = pygame.mixer.Sound(join('audio','impact.ogg'))
-        self.music = pygame.mixer.Sound(join('audio','music.wav'))
+        self.impact_sound = pygame.mixer.Sound(resource_path(join('audio', 'impact.ogg')))
+        self.music = pygame.mixer.Sound(resource_path(join('audio', 'music.wav')))
         self.music.set_volume(0.3)
-
         self.music.play(loops=-1)
+
         self.load_images()
         self.setup()
 
     def load_images(self):
-        self.bullet_surf = pygame.image.load(join('images','gun','bullet.png')).convert_alpha()
+        self.bullet_surf = pygame.image.load(resource_path(join('images', 'gun', 'bullet.png'))).convert_alpha()
 
-        folders = list(walk(join('images','enemies')))[0][1]
+        folders = list(os.walk(resource_path(join('images', 'enemies'))))[0][1]
         self.enemy_frames = {}
         for folder in folders:
-            for folder_path, _, file_names in walk(join('images','enemies',folder)):
+            for folder_path, _, file_names in os.walk(resource_path(join('images', 'enemies', folder))):
                 self.enemy_frames[folder] = []
-                for file_name in sorted(file_names, key = lambda name: int(name.split('.')[0]) ):
+                for file_name in sorted(file_names, key=lambda name: int(name.split('.')[0])):
                     full_path = join(folder_path, file_name)
                     surf = pygame.image.load(full_path).convert_alpha()
                     self.enemy_frames[folder].append(surf)
-        
+
     def input(self):
         if pygame.mouse.get_pressed()[0] and self.can_shoot:
             self.shoot_sound.play()
@@ -65,15 +83,16 @@ class Game:
                 self.can_shoot = True
 
     def setup(self):
-        map = load_pygame(join('data', 'maps', 'world.tmx'))
+        map = load_pygame(resource_path(join('data', 'maps', 'world.tmx')))
 
-        for x,y, image in map.get_layer_by_name('Ground').tiles():            
-            Sprite((x*TILE_SIZE, y*TILE_SIZE), image, self.all_sprites)
+        for x, y, image in map.get_layer_by_name('Ground').tiles():
+            Sprite((x * TILE_SIZE, y * TILE_SIZE), image, self.all_sprites)
+
         for obj in map.get_layer_by_name('Objects'):
-            CollisionSprite((obj.x , obj.y), obj.image,(self.all_sprites, self.collision_sprites))
+            CollisionSprite((obj.x, obj.y), obj.image, (self.all_sprites, self.collision_sprites))
 
         for obj in map.get_layer_by_name('Collisions'):
-            CollisionSprite((obj.x , obj.y), pygame.Surface((obj.width, obj.height)), self.collision_sprites)
+            CollisionSprite((obj.x, obj.y), pygame.Surface((obj.width, obj.height)), self.collision_sprites)
 
         for obj in map.get_layer_by_name('Entities'):
             if obj.name == 'Player':
@@ -85,7 +104,8 @@ class Game:
     def bullet_collision(self):
         if self.bullet_sprites:
             for bullet in self.bullet_sprites:
-                collisions_sprite = pygame.sprite.spritecollide(bullet, self.enemy_sprites, False, pygame.sprite.collide_mask)
+                collisions_sprite = pygame.sprite.spritecollide(
+                    bullet, self.enemy_sprites, False, pygame.sprite.collide_mask)
                 if collisions_sprite:
                     self.impact_sound.play()
                     for sprite in collisions_sprite:
@@ -98,29 +118,28 @@ class Game:
 
     def run(self):
         while self.running:
-            dt = self.clock.tick() / 1000 
+            dt = self.clock.tick() / 1000
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
                 if event.type == self.enemy_event:
-                    Enemy(choice(self.spawn_positions), choice(list(self.enemy_frames.values())), (self.all_sprites, self.enemy_sprites), self.player, self.collision_sprites)
-            
+                    Enemy(choice(self.spawn_positions),
+                          choice(list(self.enemy_frames.values())),
+                          (self.all_sprites, self.enemy_sprites),
+                          self.player, self.collision_sprites)
+
             self.gun_timer()
-
             self.input()
-            
             self.all_sprites.update(dt)
-
             self.bullet_collision()
-
             self.player_collision()
 
             self.display.fill('black')
             self.all_sprites.draw(self.player.rect.center)
-                    
             pygame.display.update()
-        
+
         pygame.quit()
+
 
 if __name__ == "__main__":
     game = Game()
